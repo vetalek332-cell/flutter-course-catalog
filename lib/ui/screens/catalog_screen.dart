@@ -268,7 +268,7 @@ class _ErrorView extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Проверьте интернет и попробуйте снова',
+              message,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
