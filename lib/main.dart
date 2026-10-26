@@ -1,49 +1,34 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app.dart';
+import 'data/repositories/auth_repository.dart';
 import 'firebase_options.dart';
-import 'ui/screens/catalog_screen.dart';
-import 'ui/screens/login_screen.dart';
+import 'logic/auth/auth_cubit.dart';
+import 'logic/theme/theme_cubit.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const CatalogApp());
+  final prefs = await SharedPreferences.getInstance();
+  runApp(CatalogApp(prefs: prefs));
 }
 
 class CatalogApp extends StatelessWidget {
-  const CatalogApp({super.key});
+  const CatalogApp({super.key, required this.prefs});
+
+  final SharedPreferences prefs;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Каталог книг',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF5C6BC0)),
-      ),
-      home: const AuthGate(),
-    );
-  }
-}
-
-/// Без входа каталог недоступен: следим за состоянием авторизации.
-class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        final user = snapshot.data;
-        if (user == null) {
-          return const LoginScreen();
-        }
-        return const CatalogScreen();
-      },
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => ThemeCubit(prefs)..load()),
+        BlocProvider(create: (_) => AuthCubit(AuthRepository())..start()),
+      ],
+      child: const AppView(),
     );
   }
 }

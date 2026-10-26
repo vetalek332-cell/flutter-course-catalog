@@ -1,84 +1,121 @@
-# Каталог книг — Университет Иннополис
+# Книжный каталог — финальный проект аттестации
 
-Учебный проект курса «Принципы управления РПП. Раздел 1. Разработка приложений на Flutter».
-Тема каталога — **книги**.
+Приложение «Каталог» на Flutter: вход по аккаунту Firebase Authentication,
+каталог в Cloud Firestore, экран деталей, управление состоянием через BLoC.
 
 ## Ветки репозитория
 
-| Ветка | Задание | Как запустить |
-|-------|---------|---------------|
-| `main` | Стартовый проект (счётчик с первого занятия) | `flutter run` |
-| `hw1` | ДЗ 1. Шесть виджетов | `flutter run -t lib/hw1/main.dart` |
-| `hw2` | ДЗ 2. Экран списка каталога | `flutter run -t lib/hw2/main.dart` |
-| `hw3` | ДЗ 3. Модель, структура, лайки | `flutter run` |
-| `hw4` | ДЗ 4. Каталог с сервера (MockAPI, GET/POST) | `flutter run` |
-| `hw5` | ДЗ 5. Firebase: вход и каталог в Firestore | `flutter run` |
-| `project` | Финальная аттестация: BLoC + Firebase + опции | `flutter run` |
+| Ветка | Задание |
+|-------|---------|
+| `main` | Стартовый проект (счётчик с первого занятия) |
+| `hw1` | ДЗ 1. Шесть виджетов |
+| `hw2` | ДЗ 2. Экран списка каталога |
+| `hw3` | ДЗ 3. Модель, структура, лайки |
+| `hw4` | ДЗ 4. Каталог с сервера (MockAPI, GET/POST) |
+| `hw5` | ДЗ 5. Firebase: вход и каталог в Firestore |
+| `project` | **Финальная аттестация (эта ветка)** |
 
-## Подготовка проекта
+## Реализованные дополнительные опции
 
-Платформенные папки (`android/`, `ios/`, `web/`, ...) не хранятся в репозитории.
-Чтобы восстановить их на своей машине, выполните в корне проекта:
+1. **Фильтры и сортировка** — фильтр по категории (чипсы) и сортировка
+   (по названию, по дате добавления, по году). Фильтры сочетаются между
+   собой и с «Только избранными», состояние хранится в Bloc.
+2. **Поиск** — поле над списком, фильтрация по названию во время ввода,
+   без учёта регистра; если ничего не найдено — заглушка.
+3. **Редактирование и удаление** — на экране деталей: изменить элемент
+   и удалить его; перед удалением диалог подтверждения; изменения
+   сохраняются в Firestore.
+4. **Профиль** — email пользователя, количество избранных элементов,
+   кнопки выхода и сброса пароля через письмо на почту.
+5. **Тёмная тема** — переключатель внутри приложения (шапка каталога и
+   экран профиля), выбор сохраняется после перезапуска (SharedPreferences).
+6. **Обновление в реальном времени** — каталог подписан на `snapshots()`
+   Firestore: изменения в Firebase Console появляются в приложении сразу.
+7. **Анимации** — Hero-анимация обложки при переходе в детали и анимация
+   нажатия на лайк.
+
+## Подготовка и запуск
 
 ```bash
-flutter create .
+flutter create .          # восстановить платформенные папки
 flutter pub get
+flutterfire configure --project=<id-вашего-проекта> --platforms=android,web
+flutter run
+flutter analyze           # ошибок быть не должно
 ```
 
-## ДЗ 4: настройка MockAPI
+Порядок настройки Firebase — как в ДЗ 5 (см. ветку `hw5`):
+- Authentication → Sign-in method → Email/Password;
+- Firestore Database + правило из файла `firestore.rules`;
+- `firebase_options.dart` генерируется командой `flutterfire configure`
+  (в репозитории лежит заглушка, чтобы проект компилировался).
 
-См. файл `mockapi/books.json` в ветке `hw4`. Адрес сервера подставляется
-в `lib/data/books_api.dart` в той же ветке.
+Если коллекция `books` пустая, на экране каталога есть кнопка
+«Заполнить демо-данными» — 12 книг одним батчем.
 
-## ДЗ 5: подключение Firebase
-
-1. Создайте проект на [console.firebase.google.com](https://console.firebase.google.com)
-   (тариф Spark, карта не нужна).
-2. Подключите Flutter-проект командой (из корня, там где `pubspec.yaml`):
-
-   ```bash
-   flutterfire configure --project=<id-вашего-проекта> --platforms=android,web
-   ```
-
-   Файл `firebase_options.dart` перезапишется настоящими значениями.
-3. В консоли Firebase включите **Authentication → Sign-in method → Email/Password**.
-4. Создайте **Firestore Database** (регион любой, режим продакшена).
-5. Вкладка **Firestore Database → Rules**: вставьте содержимое файла
-   [`firestore.rules`](firestore.rules) и нажмите Publish:
-
-   ```
-   allow read, write: if request.auth != null;
-   ```
-
-6. Запустите приложение:
-
-   ```bash
-   flutter run
-   ```
-
-7. Зарегистрируйтесь тестовой почтой (`test1@test.com`, пароль от 6 символов).
-   Если коллекция `books` пустая — на экране появится кнопка
-   «Заполнить демо-данными» (12 книг одним батчем), либо добавляйте элементы
-   формой, как требует задание.
-
-### Возможные ошибки
-
-- `permission-denied` — не выполнен вход или не опубликовано правило.
-- Ошибка `invalid-api-key` при запуске — `firebase_options.dart` всё ещё
-  содержит заглушку, выполните `flutterfire configure`.
-- Письмо GitHub Possible valid secrets detected про ключ в
-  `firebase_options.dart` — не секрет: Security → Secret scanning → закрыть
-  как False positive.
-
-### Что где лежит (ДЗ 5)
+## Как устроено приложение
 
 ```
 lib/
-├── main.dart                       # инициализация Firebase, AuthGate
-├── firebase_options.dart           # настройки проекта (генерирует flutterfire)
-├── domain/entities/book.dart       # модель: fromFirestore (id из doc.id) и toJson
+├── main.dart                            # инициализация Firebase, провайдеры ThemeCubit и AuthCubit
+├── app.dart                             # MaterialApp: светлая и тёмная темы, home: AuthGate
+├── firebase_options.dart                # настройки проекта (генерирует flutterfire)
+│
+├── domain/
+│   └── entities/
+│       └── book.dart                     # модель + enum Category: fromFirestore / toJson / copyWith
+│
+├── data/
+│   ├── seed_data.dart                   # демо-данные (12 книг)
+│   └── repositories/
+│       ├── auth_repository.dart          # вход, регистрация, сброс пароля, поток авторизации
+│       └── catalog_repository.dart       # поток книг и избранного, лайк, add/update/delete
+│
+├── logic/
+│   ├── auth/
+│   │   └── auth_cubit.dart               # состояния: unknown / authenticated / unauthenticated
+│   ├── theme/
+│   │   └── theme_cubit.dart              # светлая/тёмная тема с сохранением
+│   └── catalog/
+│       ├── catalog_bloc.dart             # подписки на Firestore + обработка событий
+│       ├── catalog_event.dart            # события: загрузить, лайкнуть, фильтры, добавить...
+│       └── catalog_state.dart            # состояния: loading / loaded / error + фильтры
+│
 └── ui/
-    ├── screens/login_screen.dart   # вход и регистрация, ошибки e.code видны на экране
-    ├── screens/catalog_screen.dart # каталог через snapshots() + StreamBuilder
-    └── widgets/book_card.dart      # карточка книги
+    ├── screens/
+    │   ├── auth_gate.dart                # экран входа, пока нет авторизации
+    │   ├── login_screen.dart             # вход и регистрация, ошибки текстом на экране
+    │   ├── catalog_screen.dart           # каталог: поиск, чипсы, сортировка, 3 состояния
+    │   ├── book_details_screen.dart      # детали, редактирование, удаление
+    │   ├── book_form_screen.dart         # добавление и редактирование (Form + валидация)
+    │   └── profile_screen.dart           # профиль: email, избранное, тема, сброс пароля, выход
+    └── widgets/
+        ├── book_card.dart                # карточка: Hero-обложка, лайк, иконка категории
+        ├── like_button.dart              # анимированная кнопка лайка
+        ├── empty_view.dart               # заглушка пустого списка
+        └── category_icon.dart            # иконки категорий
 ```
+
+### Поток данных
+
+1. `main.dart` инициализирует Firebase и создаёт `AuthCubit`
+   (подписка на `authStateChanges`) и `ThemeCubit` (SharedPreferences).
+2. `AuthGate` по состоянию `AuthCubit` показывает `LoginScreen`
+   или создаёт `CatalogBloc` через `BlocProvider`.
+3. `CatalogBloc` подписывается на два потока репозитория:
+   коллекция `books` и `users/<uid>/favorites`. Данные приходят
+   событиями, bloc хранит их в `CatalogState` (loading / loaded / error).
+4. Экраны строятся через `BlocBuilder` (а профиль ещё и `BlocListener`
+   для SnackBar). Виджеты не обращаются к Firebase напрямую — только
+   к bloc, а bloc — к репозиторию.
+5. Лайки пишутся в `users/<uid>/favorites/<id книги>` — у каждого
+   аккаунта своё избранное.
+6. Фильтры (поиск, категория, «Только избранные», сортировка) живут
+   в состоянии bloc, отфильтрованный список считается геттером
+   `visibleBooks` на лету.
+
+### Проверка состояния ошибки
+
+Отключите интернет на устройстве/эмуляторе, перезапустите приложение
+(или перезайдите) — на экране каталога появится текст ошибки и кнопка
+«Обновить». Приложение не падает.
