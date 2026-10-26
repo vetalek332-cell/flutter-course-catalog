@@ -13,13 +13,14 @@ extension CategoryLabel on Category {
 }
 
 class Book {
-  final int id;
+  final String id;
   final String title;
   final String subtitle;
   final Category category;
   final String? description;
   final int? year;
-  final int color; // цвет обложки, например 0xFF5C6BC0
+  final String color; // цвет обложки строкой без альфы, например '5C6BC0'
+  final List<String> tags;
 
   const Book({
     required this.id,
@@ -28,6 +29,38 @@ class Book {
     required this.category,
     this.description,
     this.year,
-    this.color = 0xFF5C6BC0,
+    this.color = '5C6BC0',
+    this.tags = const [],
   });
+
+  /// Превращение JSON с сервера в модель.
+  factory Book.fromJson(Map<String, dynamic> json) {
+    return Book(
+      id: json['id']?.toString() ?? '',
+      title: json['title'] as String? ?? '',
+      subtitle: json['subtitle'] as String? ?? '',
+      category:
+          Category.values.asNameMap()[json['category'] as String?] ??
+              Category.classic,
+      description: json['description'] as String?,
+      year: (json['year'] as num?)?.toInt(),
+      color: json['color'] as String? ?? '5C6BC0',
+      tags: (json['tags'] as List<dynamic>?)
+              ?.map((item) => item.toString())
+              .toList() ??
+          const [],
+    );
+  }
+
+  /// Обратное превращение модели в Map — для отправки на сервер.
+  /// id не отправляем: его выдаёт сервер.
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'subtitle': subtitle,
+        'category': category.name,
+        'description': description ?? '',
+        'year': year,
+        'tags': tags,
+        'color': color,
+      };
 }
