@@ -43,5 +43,12 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-#.firebase/         # добавлено в ДЗ 5
-#firebase-debug.log  # добавлено в ДЗ 5
+# кэш Hosting
+.firebase/
+
+# логи CLI
+firebase-debug.log
+firebase-debug.log.*
+
+# ключи сервисного аккаунта
+*-firebase-adminsdk-*.json
