@@ -23,31 +23,62 @@
 ```bash
 flutter create .
 flutter pub get
-flutter run
 ```
 
 ## ДЗ 4: настройка MockAPI
 
-1. Зайдите на [mockapi.io](https://mockapi.io) и войдите через GitHub.
-2. Создайте проект (например, `catalog`), откройте его — сверху будет адрес вида
-   `https://<ваш-токен>.mockapi.io`.
-3. В проекте нажмите **New resource**, имя — `books`. Схема (Schema):
+См. файл `mockapi/books.json` в ветке `hw4`. Адрес сервера подставляется
+в `lib/data/books_api.dart` в той же ветке.
 
-   | Поле | Тип |
-   |------|-----|
-   | title | String |
-   | subtitle | String |
-   | category | String |
-   | description | String |
-   | color | String |
-   | year | Number |
-   | tags | Array |
+## ДЗ 5: подключение Firebase
 
-   Поле `id` оставьте, остальные поля-примеры удалите.
-4. Рядом с ресурсом нажмите **Data**, удалите содержимое и вставьте целиком
-   массив из файла [`mockapi/books.json`](mockapi/books.json) (12 книг).
-   Сохраните.
-5. Проверьте в браузере `https://<ваш-токен>.mockapi.io/books` — должен прийти
-   JSON-массив.
-6. Подставьте свой адрес в константу `baseUrl` в начале файла
-   `lib/data/books_api.dart`.
+1. Создайте проект на [console.firebase.google.com](https://console.firebase.google.com)
+   (тариф Spark, карта не нужна).
+2. Подключите Flutter-проект командой (из корня, там где `pubspec.yaml`):
+
+   ```bash
+   flutterfire configure --project=<id-вашего-проекта> --platforms=android,web
+   ```
+
+   Файл `firebase_options.dart` перезапишется настоящими значениями.
+3. В консоли Firebase включите **Authentication → Sign-in method → Email/Password**.
+4. Создайте **Firestore Database** (регион любой, режим продакшена).
+5. Вкладка **Firestore Database → Rules**: вставьте содержимое файла
+   [`firestore.rules`](firestore.rules) и нажмите Publish:
+
+   ```
+   allow read, write: if request.auth != null;
+   ```
+
+6. Запустите приложение:
+
+   ```bash
+   flutter run
+   ```
+
+7. Зарегистрируйтесь тестовой почтой (`test1@test.com`, пароль от 6 символов).
+   Если коллекция `books` пустая — на экране появится кнопка
+   «Заполнить демо-данными» (12 книг одним батчем), либо добавляйте элементы
+   формой, как требует задание.
+
+### Возможные ошибки
+
+- `permission-denied` — не выполнен вход или не опубликовано правило.
+- Ошибка `invalid-api-key` при запуске — `firebase_options.dart` всё ещё
+  содержит заглушку, выполните `flutterfire configure`.
+- Письмо GitHub Possible valid secrets detected про ключ в
+  `firebase_options.dart` — не секрет: Security → Secret scanning → закрыть
+  как False positive.
+
+### Что где лежит (ДЗ 5)
+
+```
+lib/
+├── main.dart                       # инициализация Firebase, AuthGate
+├── firebase_options.dart           # настройки проекта (генерирует flutterfire)
+├── domain/entities/book.dart       # модель: fromFirestore (id из doc.id) и toJson
+└── ui/
+    ├── screens/login_screen.dart   # вход и регистрация, ошибки e.code видны на экране
+    ├── screens/catalog_screen.dart # каталог через snapshots() + StreamBuilder
+    └── widgets/book_card.dart      # карточка книги
+```
