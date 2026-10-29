@@ -6,7 +6,7 @@ import '../domain/entities/book.dart';
 
 /// Базовый адрес вашего API на MockAPI.
 /// Замените ВАШ-ТОКЕН на свой (адрес вида https://abc123.mockapi.io).
-const baseUrl = 'https://ВАШ-ТОКЕН.mockapi.io';
+const baseUrl = 'https://6ae381fa933120ae20f8dbe0.mockapi.io';
 
 /// Запросы к серверу MockAPI: загрузка каталога и добавление элемента.
 class BooksApi {
