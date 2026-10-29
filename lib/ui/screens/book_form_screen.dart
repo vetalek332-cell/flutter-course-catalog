@@ -116,7 +116,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<Category>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(
                 labelText: 'Категория',
                 border: OutlineInputBorder(),

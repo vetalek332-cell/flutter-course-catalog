@@ -32,7 +32,7 @@ class CatalogRepository {
         .map((snapshot) => snapshot.docs.map((doc) => doc.id).toSet());
   }
 
-  /// Лайк привязан к пользователю: документ users/<uid>/favorites/<id книги>.
+  /// Лайк привязан к пользователю: документ `users/<uid>/favorites/<id книги>`.
   Future<void> toggleLike({required String uid, required String bookId}) async {
     final doc = _firestore
         .collection('users')
