@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "175014335412",
+    "project_id": "catalog-hw-8821",
+    "storage_bucket": "catalog-hw-8821.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:175014335412:android:3b70ade62986e7a6f218e1",
+        "android_client_info": {
+          "package_name": "com.example.catalog"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwqLjuA3KuUq11ehclpZgb3IIt3GgGNew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,4 +1,6 @@
-// Модель одного элемента каталога — книги.
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+/// Модель одного элемента каталога — книги.
 
 enum Category { classic, fantasy, scifi, detective, adventure }
 
@@ -33,27 +35,30 @@ class Book {
     this.tags = const [],
   });
 
-  /// Превращение JSON с сервера в модель.
-  factory Book.fromJson(Map<String, dynamic> json) {
+  /// Превращение документа Firestore в модель, id берём из doc.id.
+  factory Book.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data() ?? const <String, dynamic>{};
     return Book(
-      id: json['id']?.toString() ?? '',
-      title: json['title'] as String? ?? '',
-      subtitle: json['subtitle'] as String? ?? '',
+      id: doc.id,
+      title: data['title'] as String? ?? '',
+      subtitle: data['subtitle'] as String? ?? '',
       category:
-          Category.values.asNameMap()[json['category'] as String?] ??
+          Category.values.asNameMap()[data['category'] as String?] ??
               Category.classic,
-      description: json['description'] as String?,
-      year: (json['year'] as num?)?.toInt(),
-      color: json['color'] as String? ?? '5C6BC0',
-      tags: (json['tags'] as List<dynamic>?)
+      description: data['description'] as String?,
+      year: (data['year'] as num?)?.toInt(),
+      color: data['color'] as String? ?? '5C6BC0',
+      tags: (data['tags'] as List<dynamic>?)
               ?.map((item) => item.toString())
               .toList() ??
           const [],
     );
   }
 
-  /// Обратное превращение модели в Map — для отправки на сервер.
-  /// id не отправляем: его выдаёт сервер.
+  /// Обратное превращение модели в Map — для записи в Firestore.
+  /// id не пишем: его выдаёт Firestore.
   Map<String, dynamic> toJson() => {
         'title': title,
         'subtitle': subtitle,
