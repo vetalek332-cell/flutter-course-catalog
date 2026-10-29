@@ -1,4 +1,4 @@
-/// Модель одного элемента каталога — книги.
+// Модель одного элемента каталога — книги.
 
 enum Category { classic, fantasy, scifi, detective, adventure }
 
