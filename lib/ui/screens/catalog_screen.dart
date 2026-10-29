@@ -1,12 +1,17 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/book.dart';
+import '../../logic/catalog/catalog_bloc.dart';
+import '../../logic/theme/theme_cubit.dart';
 import '../widgets/book_card.dart';
+import '../widgets/empty_view.dart';
+import 'book_details_screen.dart';
+import 'book_form_screen.dart';
+import 'profile_screen.dart';
 
-/// Экран каталога: данные читаются из коллекции Firestore через snapshots().
-/// Добавление создаёт документ в Firestore, лайки и фильтр — локально.
+/// Экран каталога: поиск, фильтры, сортировка, три состояния
+/// (загрузка / ошибка / данные). Данными управляет CatalogBloc.
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key});
 
@@ -15,254 +20,228 @@ class CatalogScreen extends StatefulWidget {
 }
 
 class _CatalogScreenState extends State<CatalogScreen> {
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _subtitleController = TextEditingController();
-
-  /// Поток — поле State, не внутри build.
-  late Stream<QuerySnapshot<Map<String, dynamic>>> _itemsStream;
-
-  bool _showForm = false;
-  bool _sending = false;
-
-  final Set<String> _likedIds = <String>{};
-  bool _favoritesOnly = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _itemsStream = FirebaseFirestore.instance.collection('books').snapshots();
-  }
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _subtitleController.dispose();
+    _searchController.dispose();
     super.dispose();
-  }
-
-  /// Кнопка «Обновить»: заново подписываемся на поток.
-  void _retry() {
-    setState(() {
-      _itemsStream =
-          FirebaseFirestore.instance.collection('books').snapshots();
-    });
-  }
-
-  void _toggleLike(String id) {
-    setState(() {
-      if (_likedIds.contains(id)) {
-        _likedIds.remove(id);
-      } else {
-        _likedIds.add(id);
-      }
-    });
-  }
-
-  Future<void> _submit() async {
-    final title = _titleController.text.trim();
-    if (title.isEmpty) {
-      // Пустое название не отправляется.
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Введите название')),
-      );
-      return;
-    }
-
-    setState(() => _sending = true);
-    try {
-      final book = Book(
-        id: '',
-        title: title,
-        subtitle: _subtitleController.text.trim().isEmpty
-            ? 'Без подписи'
-            : _subtitleController.text.trim(),
-        category: Category.classic,
-        description: '',
-      );
-      // Добавление создаёт документ в Firestore, список обновится сам.
-      await FirebaseFirestore.instance
-          .collection('books')
-          .add(book.toJson());
-      if (!mounted) return;
-      _titleController.clear();
-      _subtitleController.clear();
-      setState(() => _showForm = false);
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не удалось добавить: $error')),
-      );
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  /// Заполняет пустую коллекцию 12 книгами одним батчем.
-  Future<void> _seedDemoData() async {
-    final store = FirebaseFirestore.instance;
-    final batch = store.batch();
-    for (var i = 0; i < demoBooks.length; i++) {
-      final ref = store.collection('books').doc();
-      batch.set(ref, demoBooks[i].toJson());
-    }
-    await batch.commit();
-  }
-
-  Future<void> _logout() async {
-    await FirebaseAuth.instance.signOut();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Каталог книг'),
-        actions: [
-          IconButton(
-            tooltip: 'Выйти',
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-          ),
-          IconButton(
-            icon: Icon(_showForm ? Icons.close : Icons.add),
-            onPressed: () => setState(() => _showForm = !_showForm),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (_showForm) _buildForm(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Row(
-              children: [
-                Text(
-                  'В избранном: ${_likedIds.length}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant),
+    return BlocBuilder<CatalogBloc, CatalogState>(
+      builder: (context, state) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Книжный каталог'),
+            actions: [
+              // Дополнительная опция «Тёмная тема».
+              IconButton(
+                icon: Icon(
+                  context.watch<ThemeCubit>().state == ThemeMode.dark
+                      ? Icons.light_mode
+                      : Icons.dark_mode,
                 ),
-                const Spacer(),
-                FilterChip(
-                  label: const Text('Только избранные'),
-                  selected: _favoritesOnly,
-                  onSelected: (value) =>
-                      setState(() => _favoritesOnly = value),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _itemsStream,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return _ErrorView(
-                    message:
-                        'Не удалось загрузить каталог: ${snapshot.error}',
-                    onRetry: _retry,
-                  );
-                }
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final books = snapshot.data?.docs
-                        .map(Book.fromFirestore)
-                        .toList() ??
-                    const <Book>[];
-
-                // Совсем пустая коллекция — предложим заполнить демо-данными.
-                if (books.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('В каталоге пока пусто'),
-                        const SizedBox(height: 12),
-                        FilledButton.tonalIcon(
-                          onPressed: _seedDemoData,
-                          icon: const Icon(Icons.auto_stories),
-                          label: const Text('Заполнить демо-данными'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final filtered = _favoritesOnly
-                    ? books
-                        .where((book) => _likedIds.contains(book.id))
-                        .toList()
-                    : books;
-
-                if (filtered.isEmpty) {
-                  return const Center(child: Text('Ничего не нашлось'));
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    final book = filtered[index];
-                    return BookCard(
-                      book: book,
-                      isLiked: _likedIds.contains(book.id),
-                      onLikeTap: () => _toggleLike(book.id),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildForm() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Column(
-        children: [
-          TextField(
-            controller: _titleController,
-            decoration: const InputDecoration(
-              labelText: 'Название *',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.title),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _subtitleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Подпись (автор, необязательно)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person_outline),
+                onPressed: () => context.read<ThemeCubit>().toggle(),
+              ),
+              IconButton(
+                tooltip: 'Профиль',
+                icon: const Icon(Icons.person_outline),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ProfileScreen(),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _sending ? null : _submit,
-                child: _sending
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Отправить'),
+            ],
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const BookFormScreen(),
+              ),
+            ),
+            icon: const Icon(Icons.add),
+            label: const Text('Добавить'),
+          ),
+          body: Column(
+            children: [
+              // Дополнительная опция «Поиск»: фильтрация во время ввода.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => context
+                      .read<CatalogBloc>()
+                      .add(CatalogQueryChanged(value)),
+                  decoration: InputDecoration(
+                    hintText: 'Поиск по названию',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: state.query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              context.read<CatalogBloc>().add(
+                                    const CatalogQueryChanged(''),
+                                  );
+                            },
+                          ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              // Дополнительная опция «Фильтры и сортировка».
+              SizedBox(
+                height: 44,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          FilterChip(
+                            label: Text('Избранное · ${state.favoritesCount}'),
+                            selected: state.favoritesOnly,
+                            onSelected: (_) => context
+                                .read<CatalogBloc>()
+                                .add(const CatalogFavoritesOnlyToggled()),
+                          ),
+                          const SizedBox(width: 8),
+                          FilterChip(
+                            label: const Text('Все'),
+                            selected: state.categoryFilter == null,
+                            onSelected: (_) => context
+                                .read<CatalogBloc>()
+                                .add(const CatalogCategorySelected(null)),
+                          ),
+                          for (final category in Category.values)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: FilterChip(
+                                label: Text(category.label),
+                                selected:
+                                    state.categoryFilter == category,
+                                onSelected: (_) =>
+                                    context.read<CatalogBloc>().add(
+                                          CatalogCategorySelected(category),
+                                        ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuButton<CatalogSort>(
+                      icon: const Icon(Icons.sort),
+                      tooltip: 'Сортировка',
+                      initialValue: state.sort,
+                      onSelected: (sort) => context
+                          .read<CatalogBloc>()
+                          .add(CatalogSortSelected(sort)),
+                      itemBuilder: (_) => [
+                        for (final sort in CatalogSort.values)
+                          PopupMenuItem(
+                            value: sort,
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  child: sort == state.sort
+                                      ? const Icon(Icons.check, size: 18)
+                                      : null,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(sort.label),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Expanded(
+                child: switch (state.status) {
+                  CatalogStatus.loading => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  CatalogStatus.error => _ErrorView(
+                      message: state.error ?? 'Не удалось загрузить каталог',
+                      onRetry: () => context.read<CatalogBloc>().add(
+                            const CatalogRefreshRequested(),
+                          ),
+                    ),
+                  CatalogStatus.loaded => _buildList(context, state),
+                },
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
+    );
+  }
+
+  Widget _buildList(BuildContext context, CatalogState state) {
+    final books = state.visibleBooks;
+
+    if (books.isEmpty) {
+      // Пустой список — заглушка с текстом.
+      if (state.favoritesOnly &&
+          state.categoryFilter == null &&
+          state.query.trim().isEmpty) {
+        return const EmptyView(
+          icon: Icons.favorite_border,
+          title: 'В избранном пока пусто',
+          subtitle: 'Нажмите на сердечко в карточке, чтобы добавить книгу',
+        );
+      }
+      if (state.hasActiveFilters) {
+        return const EmptyView(
+          icon: Icons.search_off,
+          title: 'Ничего не нашлось',
+          subtitle: 'Попробуйте изменить фильтры или очистить поиск',
+        );
+      }
+      return EmptyView(
+        icon: Icons.library_books,
+        title: 'В каталоге пока пусто',
+        subtitle: 'Добавьте первую книгу или заполните демо-данными',
+        action: FilledButton.tonalIcon(
+          onPressed: () => context
+              .read<CatalogBloc>()
+              .add(const CatalogDemoDataRequested()),
+          icon: const Icon(Icons.auto_stories),
+          label: const Text('Заполнить демо-данными'),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 88),
+      itemCount: books.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final book = books[index];
+        return BookCard(
+          book: book,
+          isLiked: state.likedIds.contains(book.id),
+          onLikeTap: () => context
+              .read<CatalogBloc>()
+              .add(CatalogLikeToggled(book.id)),
+          onOpen: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => BookDetailsScreen(bookId: book.id),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -284,9 +263,16 @@ class _ErrorView extends StatelessWidget {
             const Icon(Icons.cloud_off, size: 56),
             const SizedBox(height: 12),
             Text(
+              'Не удалось загрузить каталог',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -300,140 +286,3 @@ class _ErrorView extends StatelessWidget {
     );
   }
 }
-
-/// Демо-данные каталога: 12 книг. Заполняются кнопкой на пустом экране
-/// (по заданию достаточно добавить 8+ элементов формой — это просто быстрее).
-const demoBooks = <Book>[
-  Book(
-    id: '',
-    title: 'Мастер и Маргарита',
-    subtitle: 'Михаил Булгаков',
-    category: Category.classic,
-    color: '5C6BC0',
-    year: 1967,
-    tags: ['роман', 'мистика'],
-    description:
-        'Роман о визите Воланда в Москву 1930-х годов: история Мастера, его романа о Понтии Пилате и любви, которая сильнее времени.',
-  ),
-  Book(
-    id: '',
-    title: 'Собака Баскервилей',
-    subtitle: 'Артур Конан Дойл',
-    category: Category.detective,
-    color: '26A69A',
-    year: 1902,
-    tags: ['шерлок холмс', 'классика детектива'],
-    description:
-        'Шерлок Холмс и доктор Ватсон расследуют загадочную смерть сэра Чарльза Баскервиля и семейное проклятие в Дартмуре.',
-  ),
-  Book(
-    id: '',
-    title: 'Властелин колец',
-    subtitle: 'Дж. Р. Р. Толкин',
-    category: Category.fantasy,
-    color: '7E57C2',
-    year: 1954,
-    tags: ['эпическое фэнтези', 'трилогия'],
-    description:
-        'Хоббит Фродо отправляется в Мордор, чтобы уничтожить Кольцо Всевластия и спасти Средиземье от Саурона.',
-  ),
-  Book(
-    id: '',
-    title: 'Дюна',
-    subtitle: 'Фрэнк Герберт',
-    category: Category.scifi,
-    color: 'EF6C00',
-    year: 1965,
-    tags: ['фантастика', 'эпопея'],
-    description:
-        'На пустынной планете Арракис юный Пол Атрейдес возглавляет борьбу за самую ценную субстанцию Вселенной — пряность.',
-  ),
-  Book(
-    id: '',
-    title: 'Гарри Поттер и философский камень',
-    subtitle: 'Дж. К. Роулинг',
-    category: Category.fantasy,
-    color: '8D6E63',
-    year: 1997,
-    tags: ['детская фантастика', 'школа'],
-    description:
-        'Мальчик-волшебник поступает в школу Хогвартс, находит верных друзей и узнаёт правду о гибели родителей.',
-  ),
-  Book(
-    id: '',
-    title: 'Пикник на обочине',
-    subtitle: 'Аркадий и Борис Стругацкие',
-    category: Category.scifi,
-    color: '546E7A',
-    year: 1972,
-    tags: ['советская фантастика', 'сталкер'],
-    description:
-        'Сталкер Рэдрик Шухарт ходит в Зону за артефактами, оставленными пришельцами, и платит за это высокую цену.',
-  ),
-  Book(
-    id: '',
-    title: 'Маленький принц',
-    subtitle: 'Антуан де Сент-Экзюпери',
-    category: Category.classic,
-    color: '42A5F5',
-    year: 1943,
-    tags: ['философская сказка'],
-    description:
-        'Пилот, потерпевший крушение в Сахаре, знакомится с маленьким принцем с далёкой планеты и учится видеть главное.',
-  ),
-  Book(
-    id: '',
-    title: 'Три товарища',
-    subtitle: 'Эрих Мария Ремарк',
-    category: Category.classic,
-    color: 'AB47BC',
-    year: 1936,
-    tags: ['роман о дружбе', 'XX век'],
-    description:
-        'История дружбы трёх фронтовых товарищей и любви Роберта Локампа к Пат в Германии между двумя войнами.',
-  ),
-  Book(
-    id: '',
-    title: 'Хоббит, или Туда и обратно',
-    subtitle: 'Дж. Р. Р. Толкин',
-    category: Category.fantasy,
-    color: '66BB6A',
-    year: 1937,
-    tags: ['приключения', 'Средиземье'],
-    description:
-        'Бильбо Бэггинс отправляется с гномами к Одинокой горе, чтобы отвоевать сокровища у дракона Смауга.',
-  ),
-  Book(
-    id: '',
-    title: '451 градус по Фаренгейту',
-    subtitle: 'Рэй Брэдбери',
-    category: Category.scifi,
-    color: 'FF7043',
-    year: 1953,
-    tags: ['антиутопия', 'запрещённые книги'],
-    description:
-        'В будущем, где книги запрещены и сжигаются, пожарный Гай Монтэг начинает сомневаться в системе и читать.',
-  ),
-  Book(
-    id: '',
-    title: 'Убийство в «Восточном экспрессе»',
-    subtitle: 'Агата Кристи',
-    category: Category.detective,
-    color: 'EC407A',
-    year: 1934,
-    tags: ['пуаро', 'детектив'],
-    description:
-        'Эркюль Пуаро расследует убийство пассажира в поезде, застрявшем в снегах, где подозреваемым оказывается каждый.',
-  ),
-  Book(
-    id: '',
-    title: 'Двенадцать стульев',
-    subtitle: 'Илья Ильф и Евгений Петров',
-    category: Category.adventure,
-    color: 'FFA726',
-    year: 1928,
-    tags: ['сатира', 'авантюра'],
-    description:
-        'Великий комбинатор Остап Бендер и Киса Воробьянинов ищут бриллианты, спрятанные в одном из двенадцати стульев.',
-  ),
-];

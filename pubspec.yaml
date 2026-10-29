@@ -1,7 +1,7 @@
 name: catalog
-description: Каталог книг — курс «Разработка приложений на Flutter», Университет Иннополис.
+description: Каталог книг — финальный проект аттестации. Университет Иннополис.
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+2
 
 environment:
   sdk: ^3.5.0
@@ -13,6 +13,8 @@ dependencies:
   firebase_core: ^3.12.1
   firebase_auth: ^5.5.0
   cloud_firestore: ^5.6.0
+  flutter_bloc: ^8.1.6
+  shared_preferences: ^2.3.4
 
 dev_dependencies:
   flutter_test:
