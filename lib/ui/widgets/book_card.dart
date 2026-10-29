@@ -17,7 +17,7 @@ class BookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(book.color);
+    final color = Color(int.parse('FF${book.color}', radix: 16));
     final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),

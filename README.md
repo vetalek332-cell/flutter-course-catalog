@@ -26,5 +26,28 @@ flutter pub get
 flutter run
 ```
 
-Тестовый файл `test/widget_test.dart` уже лежит в репозитории, поэтому
-`flutter create .` не затрёт его стандартным тестом под другой проект.
+## ДЗ 4: настройка MockAPI
+
+1. Зайдите на [mockapi.io](https://mockapi.io) и войдите через GitHub.
+2. Создайте проект (например, `catalog`), откройте его — сверху будет адрес вида
+   `https://<ваш-токен>.mockapi.io`.
+3. В проекте нажмите **New resource**, имя — `books`. Схема (Schema):
+
+   | Поле | Тип |
+   |------|-----|
+   | title | String |
+   | subtitle | String |
+   | category | String |
+   | description | String |
+   | color | String |
+   | year | Number |
+   | tags | Array |
+
+   Поле `id` оставьте, остальные поля-примеры удалите.
+4. Рядом с ресурсом нажмите **Data**, удалите содержимое и вставьте целиком
+   массив из файла [`mockapi/books.json`](mockapi/books.json) (12 книг).
+   Сохраните.
+5. Проверьте в браузере `https://<ваш-токен>.mockapi.io/books` — должен прийти
+   JSON-массив.
+6. Подставьте свой адрес в константу `baseUrl` в начале файла
+   `lib/data/books_api.dart`.
