@@ -3,6 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
+import 'logic/books/books_bloc.dart';
+import 'logic/books/books_event.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'ui/screens/catalog_screen.dart';
 import 'ui/screens/login_screen.dart';
 
@@ -42,7 +45,11 @@ class AuthGate extends StatelessWidget {
         if (user == null) {
           return const LoginScreen();
         }
-        return const CatalogScreen();
+        // BlocProvider выше экрана: контекст экрана видит BooksBloc
+        return BlocProvider(
+          create: (_) => BooksBloc()..add(const BooksLoadRequested()),
+          child: const CatalogScreen(),
+        );
       },
     );
   }

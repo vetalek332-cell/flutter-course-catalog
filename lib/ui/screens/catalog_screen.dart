@@ -88,9 +88,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => BooksBloc()..add(const BooksLoadRequested()),
-      child: Scaffold(
+    return Scaffold(
         appBar: AppBar(
           title: const Text('Каталог книг'),
           actions: [
@@ -195,7 +193,6 @@ class _CatalogScreenState extends State<CatalogScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 
